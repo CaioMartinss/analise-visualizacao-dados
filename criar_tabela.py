@@ -19,7 +19,7 @@ query_dados_matricula = """
 
 # Consulta para ler dados da tabela media_alunos
 query_media_alunos = """
-    SELECT registro_geral, disciplina, media_final, turma
+    SELECT registro_geral, media_final, turma
     FROM media_alunos
 """
 
@@ -35,15 +35,16 @@ dados_matricula['ano'] = pd.to_datetime(dados_matricula['data_matricula'], forma
 
 # Agrupar as médias por aluno
 media_agrupada = media_alunos.groupby('registro_geral')['media_final'].mean().reset_index()
-media_agrupada.columns = ['registro_geral', 'media_todas_materias']
+media_agrupada.columns = ['registro_geral', 'media_final']
 
 # Mesclar dados de matrícula com médias agrupadas
 result = pd.merge(dados_matricula, media_agrupada, on='registro_geral')
 
 # Selecionar os campos desejados
-result = result[['registro_geral', 'media_todas_materias', 'ano', 'turno']]
+result = result[['registro_geral', 'media_final', 'ano', 'turno']]
 
-# Salvar o resultado em um novo arquivo CSV
-result.to_csv('media_alunos_agrupada.csv', index=False)
+# Salvar os dados em um arquivo Excel
+with pd.ExcelWriter('media_alunos_agrupada.xlsx', engine='xlsxwriter') as writer:
+    result.to_excel(writer, sheet_name='Media_Alunos', index=False)
 
-print("Arquivo CSV criado com sucesso!")
+print("Arquivo Excel criado com sucesso!")

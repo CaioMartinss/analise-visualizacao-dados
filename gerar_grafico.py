@@ -1,60 +1,54 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
 from sklearn.linear_model import LinearRegression
-from sklearn.preprocessing import PolynomialFeatures
 
 # Carregar os dados
-data = pd.read_csv('./media_alunos_agrupada.csv')
+data = pd.read_csv('media_alunos_agrupada.csv')
 
-# Verificar valores ausentes
-print(data.isnull().sum())
+# Ajustar o formato da média final
+data['media_final'] = data['media_final'].str.replace(',', '.').astype(float)
 
-# Remover linhas com valores ausentes
-data = data.dropna()
+# Remover o turno "diurno" dos dados
+data = data[data['turno'] != 'DIURNO']
 
-# Mapear os turnos para números
-turno_map = {'MATUTINO': 0, 'VESPERTINO': 1, 'NOTURNO': 2}
-data['turno_num'] = data['turno'].map(turno_map)
+# Agrupar as médias por ano e turno
+grouped_data = data.groupby(['ano', 'turno'])['media_final'].mean().reset_index()
 
-# Verificar valores ausentes novamente
-print(data[['turno_num', 'media_todas_materias']].isnull().sum())
-
-# Remover qualquer linha que tenha NaN em 'turno_num' ou 'media_todas_materias'
-data = data.dropna(subset=['turno_num', 'media_todas_materias'])
-
-# Configurar o gráfico de dispersão
+# Plotar o gráfico de dispersão
 plt.figure(figsize=(10, 6))
-sns.scatterplot(x='turno_num', y='media_todas_materias', hue='turno', data=data)
 
-# Configurar o modelo de regressão linear
-X = data[['turno_num']]
-y = data['media_todas_materias']
+# Adicionar os pontos para cada turno e traçar a reta de regressão
+for turno in ['MATUTINO', 'VESPERTINO']:
+    subset = grouped_data[grouped_data['turno'] == turno]
+    plt.scatter(subset['ano'], subset['media_final'], label=turno)
 
-# Ajustar a regressão linear
+# Adicionar uma linha de tendência para todos os dados
+X = grouped_data['ano'].values.reshape(-1, 1)
+y = grouped_data['media_final'].values
 linear_model = LinearRegression()
 linear_model.fit(X, y)
-y_pred_linear = linear_model.predict(X)
+X_pred = np.arange(2022, 2027).reshape(-1, 1)
+y_pred = linear_model.predict(X_pred)
+plt.plot(X_pred, y_pred, color='black', linestyle='--', label='Linha de Tendência')
 
-# Adicionar a linha de regressão linear ao gráfico
-plt.plot(data['turno_num'], y_pred_linear, color='red', label='Regressão Linear')
+# Adicionar as projeções lineares para 2025 para cada turno
+X_2025 = np.array([[2025]])
+for turno in ['MATUTINO', 'VESPERTINO']:
+    subset = grouped_data[grouped_data['turno'] == turno]
+    X_turno = subset['ano'].values.reshape(-1, 1)
+    y_turno = subset['media_final'].values
+    linear_model_turno = LinearRegression()
+    linear_model_turno.fit(X_turno, y_turno)
+    y_2025_pred_turno = linear_model_turno.predict(X_2025)
+    plt.scatter(2025, y_2025_pred_turno, marker='o', color='red', label=f'Projeção Linear 2025 - {turno}')
 
-# Configurar o modelo de regressão polinomial (grau 2)
-poly = PolynomialFeatures(degree=2)
-X_poly = poly.fit_transform(X)
-poly_model = LinearRegression()
-poly_model.fit(X_poly, y)
-y_pred_poly = poly_model.predict(X_poly)
-
-# Adicionar a linha de regressão polinomial ao gráfico
-plt.plot(data['turno_num'], y_pred_poly, color='blue', label='Regressão Polinomial (grau 2)')
-
-# Configurações finais do gráfico
-plt.xlabel('Turno')
-plt.ylabel('Média de Todas as Matérias')
-plt.title('Relação entre Notas e Turnos com Projeção Linear e Polinomial')
+# Configurações do gráfico
+plt.xlabel('Ano')
+plt.ylabel('Média Final (0-10)')
+plt.title('Média Final dos Alunos por Ano e Turno com Projeção Linear para 2025')
 plt.legend()
-plt.xticks(ticks=[0, 1, 2], labels=['MATUTINO', 'VESPERTINO', 'NOTURNO'])
 plt.grid(True)
+plt.xticks(np.arange(2022, 2027, 1))
+plt.yticks(np.arange(0, 11, 1))
 plt.show()
