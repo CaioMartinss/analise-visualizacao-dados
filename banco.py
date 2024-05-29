@@ -18,7 +18,6 @@ def criar_tabelas(cursor):
             id INT AUTO_INCREMENT PRIMARY KEY,
             registro_geral INT,
             disciplina VARCHAR(100),
-            nome VARCHAR(100),
             media_final FLOAT,
             turma VARCHAR(20),
             FOREIGN KEY (registro_geral) REFERENCES dados_matricula(registro_geral)
@@ -42,16 +41,16 @@ def inserir_dados_matricula(cursor, data):
 def inserir_media_alunos(cursor, data):
     for index, row in data.iterrows():
         cursor.execute("""
-            INSERT INTO media_alunos (registro_geral, disciplina, nome, media_final, turma)
-            VALUES (%s, %s, %s, %s, %s)
-        """, (row['registro_geral'], row['disciplina'], row['nome'], row['media_final'], row['turma']))
+            INSERT INTO media_alunos (registro_geral, disciplina, media_final, turma)
+            VALUES (%s, %s, %s, %s)
+        """, (row['registro_geral'], row['disciplina'], row['media_final'], row['turma']))
 
 # Conectar ao servidor MySQL
 conn = mysql.connector.connect(
     host="localhost",
     port="3306",
     user="root",
-    password="root",
+    password="",
     database="escola"
 )
 
@@ -64,9 +63,23 @@ criar_tabelas(cursor)
 dados_matricula = pd.read_csv('dados_matricula.csv')
 media_alunos = pd.read_csv('media_alunos.csv')
 
+# Remover duplicatas no dados_matricula
+dados_matricula = dados_matricula.drop_duplicates(subset=['registro_geral'])
+
 # Inserir dados nas tabelas
 inserir_dados_matricula(cursor, dados_matricula)
-inserir_media_alunos(cursor, media_alunos)
+
+# Filtrar valores nulos em media_final
+media_alunos = media_alunos.dropna(subset=['media_final'])
+
+# Converter valores de media_final para float, substituindo vírgulas por pontos
+media_alunos['media_final'] = media_alunos['media_final'].str.replace(',', '.').astype(float)
+
+# Agrupar os dados por registro_geral e calcular a média das notas
+media_agrupada = media_alunos.groupby(['registro_geral', 'disciplina', 'turma'])['media_final'].mean().reset_index()
+
+# Inserir dados na tabela media_alunos
+inserir_media_alunos(cursor, media_agrupada)
 
 # Confirmar as alterações no banco de dados
 conn.commit()
